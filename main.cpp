@@ -279,13 +279,6 @@ struct DFA
 
     void minimize()
     {
-        /*
-        performs the DFA minimization process by initializing the equivalence matrix, marking all non-equivalent state pairs, and propagating their dependencies.
-        then builds the representatives array to identify the minimized states.
-
-        returns the representative of each state, which is used to construct and print the minimized DFA.
-        */
-
         build_nonequivalent_list();
         mark_dependencies();
         int *rep = build_representatives();
@@ -297,42 +290,76 @@ struct DFA
 
 int main()
 {
-    // Test 1: first board example (accepting state: 4)
-    DFA d1(5);
-    d1.add_transition(0, 2, 'a');
-    d1.add_transition(0, 1, 'b');
+
+    // Test 1: third board example (accepting state: 3)
+    DFA d1(4);
+    d1.add_transition(0, 1, 'a');
+    d1.add_transition(0, 2, 'b');
     d1.add_transition(1, 3, 'a');
     d1.add_transition(1, 1, 'b');
     d1.add_transition(2, 3, 'a');
     d1.add_transition(2, 2, 'b');
     d1.add_transition(3, 3, 'a');
-    d1.add_transition(3, 4, 'b');
-    d1.add_transition(4, 4, 'a');
-    d1.add_transition(4, 4, 'b');
-    d1.set_accepting(4);
+    d1.add_transition(3, 3, 'b');
+    d1.set_accepting(3);
 
-    cout << "===== Test 1 =====" << endl;
+    cout << "\n===== Test 1 =====\n";
     d1.minimize();
 
-    // Test 2: second board example (accepting states: {4, 5})
-    DFA d2(6);
-    d2.add_transition(0, 1, 'a');
-    d2.add_transition(0, 2, 'b');
-    d2.add_transition(1, 4, 'a');
+    // Test 2: fourth board example (accepting state: {4})
+    DFA d2(5);
+    d2.add_transition(0, 2, 'a');
+    d2.add_transition(0, 1, 'b');
+    d2.add_transition(1, 3, 'a');
     d2.add_transition(1, 1, 'b');
-    d2.add_transition(2, 4, 'a');
-    d2.add_transition(2, 3, 'b');
-    d2.add_transition(3, 4, 'a');
-    d2.add_transition(3, 3, 'b');
+    d2.add_transition(2, 3, 'a');
+    d2.add_transition(2, 2, 'b');
+    d2.add_transition(3, 3, 'a');
+    d2.add_transition(3, 4, 'b');
     d2.add_transition(4, 4, 'a');
-    d2.add_transition(4, 5, 'b');
-    d2.add_transition(5, 5, 'a');
-    d2.add_transition(5, 5, 'b');
+    d2.add_transition(4, 4, 'b');
     d2.set_accepting(4);
-    d2.set_accepting(5);
 
-    cout << endl << "===== Test 2 =====" << endl;
+    cout << "\n===== Test 2 =====\n";
     d2.minimize();
+
+    // Test 3: fifth board example (accepting states: {4, 5})
+    DFA d3(6);
+    d3.add_transition(0, 1, 'a');
+    d3.add_transition(0, 2, 'b');
+    d3.add_transition(1, 4, 'a');
+    d3.add_transition(1, 1, 'b');
+    d3.add_transition(2, 4, 'a');
+    d3.add_transition(2, 3, 'b');
+    d3.add_transition(3, 4, 'a');
+    d3.add_transition(3, 3, 'b');
+    d3.add_transition(4, 4, 'a');
+    d3.add_transition(4, 5, 'b');
+    d3.add_transition(5, 5, 'a');
+    d3.add_transition(5, 5, 'b');
+    d3.set_accepting(4);
+    d3.set_accepting(5);
+
+    cout << "\n===== Test 3 =====\n";
+    d3.minimize();
+    
+    
+    // Test 4: first board example (accepting states: {1, 2, 3})
+    // replaced the alphabet symbol "letter" with "a" and the alphabet symbol "digit" with "b"
+    // also coonverted it to 0-based instead of 1-based
+    DFA d4(4);
+    d4.add_transition(0, 1, 'a');
+    d4.add_transition(1, 2, 'a');
+    d4.add_transition(1, 3, 'b');
+    d4.add_transition(2, 2, 'a');
+    d4.add_transition(2, 3, 'b');
+    d4.add_transition(3, 3, 'b');
+    d4.set_accepting(1);
+    d4.set_accepting(2);
+    d4.set_accepting(3);
+    
+    cout << "\n===== Test 4 =====\n";
+    d4.minimize();
 
     return 0;
 }
