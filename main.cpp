@@ -1,8 +1,9 @@
 #include <iostream>
 using namespace std;
-#define endl '\n'
 #define ALPHA 26
 
+
+// a utility list used for as dynamic-sized array
 template <class T>
 class list 
 {
@@ -72,21 +73,21 @@ struct Pair
 struct DFA
 {
     int num_states;
-    list<int> **adj;
+    list<int> **adjecancy_list;
     list<int> **reversed_graph;
-    bool **equivalent;
-    bool *is_accepting;
+    bool **equivalent; // a table of size n x n to mark the equivalents of each state
+    bool *is_accepting; // a frequency array to check if a state is an accepting state or a reqular one
     list<Pair> non_equivalent_pairs;
 
     DFA(int n) : num_states(n)
     {
-        adj = new list<int>* [n];
+        adjecancy_list = new list<int>* [n];
         reversed_graph = new list<int>* [n];
         equivalent = new bool*[n];
         is_accepting = new bool[n];
         for (int i = 0; i < n; i++)
         {
-            adj[i] = new list<int> [ALPHA];
+            adjecancy_list[i] = new list<int> [ALPHA];
             reversed_graph[i] = new list<int> [ALPHA];
             equivalent[i] = new bool[n];
             is_accepting[i] = false;
@@ -97,11 +98,11 @@ struct DFA
     {
         for (int i = 0; i < num_states; i++)
         {
-            delete[] adj[i];
+            delete[] adjecancy_list[i];
             delete[] reversed_graph[i];
             delete[] equivalent[i];
         }
-        delete[] adj;
+        delete[] adjecancy_list;
         delete[] reversed_graph;
         delete[] equivalent;
         delete[] is_accepting;
@@ -114,7 +115,7 @@ struct DFA
     
     void add_transition(int from, int to, char sym)
     {
-        adj[from][sym - 'a'].push(to);
+        adjecancy_list[from][sym - 'a'].push(to);
         reversed_graph[to][sym - 'a'].push(from);
     }
 
@@ -128,23 +129,18 @@ struct DFA
     void build_nonequivalent_list() 
     { 
         /*
-            fills the @non_eq list with the non equivalent pairs
+            fills the non_equivalent_pairs list 
             also builds the @equivalent matrix the determines if two states are equivalents
-        */
-    
-        equivalent = new bool* [num_states];
-        for (int i = 0; i < num_states; i++)
-            equivalent[i] = new bool [num_states];
-        
+        */    
         
         // marking each pair of accepting and non-accepting state as not equivalent
-        for (int i = 0; i < num_states; i++) 
-            // stop at j <= i so we visit each pair only once as the matrix is symmetric
-            for (int j = 0; j <= i; j++) {
-                equivalent[i][j] = (is_accepting[i] == is_accepting[j]);
-                equivalent[j][i] = equivalent[i][j];
-                if (!equivalent[i][j])
-                    non_equivalent_pairs.push(Pair(i,j));
+        for (int p = 0; p < num_states; p++) 
+            // stop at q <= p so we visit each pair only once as the matrix is symmetric
+            for (int q = 0; q <= p; q++) {
+                equivalent[p][q] = (is_accepting[p] == is_accepting[q]);
+                equivalent[q][p] = equivalent[p][q];
+                if (!equivalent[p][q])
+                    non_equivalent_pairs.push(Pair(p,q));
             }
     }
     
@@ -168,15 +164,18 @@ struct DFA
     
             for (int a = 0; a < ALPHA; ++a)
             {
-                list<int> &pred_p = reversed_graph[p][a]; // go to p by a
-                list<int> &pred_q = reversed_graph[q][a]; // go to q b a
+                list<int> &pred_p = reversed_graph[p][a]; // list of states that go to @p on @a
+                list<int> &pred_q = reversed_graph[q][a]; // list of states that go to @q on @a
     
+                // constructing the combinations of p's predecessors and q's predessors 
                 for (int i = 0; i < pred_p.size(); ++i)
                 {
                     int r = pred_p[i];
                     for (int j = 0; j < pred_q.size(); ++j)
                     {
                         int s = pred_q[j];
+                        
+                        // reject pairs of the same state
                         if (r == s) continue;
     
                         if (equivalent[r][s])
@@ -244,8 +243,8 @@ struct DFA
             if (rep[r] != r) continue;
             for (int a = 0; a < ALPHA; a++)
             {
-                if (adj[r][a].empty()) continue;
-                int t = adj[r][a][0];
+                if (adjecancy_list[r][a].empty()) continue;
+                int t = adjecancy_list[r][a][0];
                 print_class(r, rep);        // from
                 cout << " -- ";
                 print_class(rep[t], rep);   // to
