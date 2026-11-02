@@ -74,19 +74,23 @@ struct DFA
     int num_states;
     list<int> **adj;
     list<int> **reversed_graph;
+    bool **equivalent;
     bool *is_accepting;
+    list<Pair> non_equivalent_pairs;
 
     DFA(int n) : num_states(n)
     {
         adj = new list<int>* [n];
         reversed_graph = new list<int>* [n];
+        equivalent = new bool*[n];
+        is_accepting = new bool[n];
         for (int i = 0; i < n; i++)
         {
             adj[i] = new list<int> [ALPHA];
             reversed_graph[i] = new list<int> [ALPHA];
+            equivalent[i] = new bool[n];
+            is_accepting[i] = false;
         }
-        is_accepting = new bool[n];
-        for (int i = 0; i < n; i++) is_accepting[i] = false;
     }
 
     ~DFA()
@@ -95,9 +99,11 @@ struct DFA
         {
             delete[] adj[i];
             delete[] reversed_graph[i];
+            delete[] equivalent[i];
         }
         delete[] adj;
         delete[] reversed_graph;
+        delete[] equivalent;
         delete[] is_accepting;
     }
 
@@ -105,211 +111,163 @@ struct DFA
 
     DFA& operator=(const DFA &) = delete;
 
+    
     void add_transition(int from, int to, char sym)
     {
         adj[from][sym - 'a'].push(to);
         reversed_graph[to][sym - 'a'].push(from);
     }
 
+    
     void set_accepting(int state)
     {
         is_accepting[state] = true;
     }
-};
-
-void read_input(list<int> **&adj, list<int> **&reversed_graph, bool *&is_accepting, int &num_states)
-{
-    /* reads the input and fills the number of states, adjacency list, reversed graph and the flags of accepting states
-    @param is_accepting is a list of all states each of which is flagged 1 if it is accepting and 0 otherwise
-    */
     
-    cout << "Enter the number of states: ";
-    cin >> num_states;
-    cout << endl;
     
-    // initializing the adjacency lists
-    adj = new list<int>* [num_states];
-    reversed_graph = new list<int>* [num_states];
-    for (int i = 0; i < num_states; i++)
-    {
-        adj[i] = new list<int> [26];
-        reversed_graph[i] = new list<int> [26];
+    void build_nonequivalent_list() 
+    { 
+        /*
+            fills the @non_eq list with the non equivalent pairs
+            also builds the @equivalent matrix the determines if two states are equivalents
+        */
+    
+        equivalent = new bool* [num_states];
+        for (int i = 0; i < num_states; i++)
+            equivalent[i] = new bool [num_states];
+        
+        
+        // marking each pair of accepting and non-accepting state as not equivalent
+        for (int i = 0; i < num_states; i++) 
+            // stop at j <= i so we visit each pair only once as the matrix is symmetric
+            for (int j = 0; j <= i; j++) {
+                equivalent[i][j] = (is_accepting[i] == is_accepting[j]);
+                equivalent[j][i] = equivalent[i][j];
+                if (!equivalent[i][j])
+                    non_equivalent_pairs.push(Pair(i,j));
+            }
     }
-
-
-    cout << "Enter the number of transitions: ";
-    int transitions; cin >> transitions;
-    cout << endl;
-
-    cout << "Enter the transitions in this format: x y a\n which means there is a transition from state x to state y on symbol a"<<endl;
-    for (int i = 0; i < transitions; i++)
+    
+    
+    void mark_dependencies() 
     {
-        int x, y; cin >> x >> y;
-        char a; cin >> a;
-        adj[x][a-'a'].push(y);
-        reversed_graph[y][a-'a'].push(x);
-    }
+        /*
+        iterates over the @non_equivalent_pairs, constructs dependencies of each pair from the reversed graph
+        and marks their states as non equivalents. 
+        when two states p,q are found inequivalent, the @equivalent[p][q] is set false
 
-    cout << "Enter the number of accepting states: ";
-    int accepting_states; cin >> accepting_states;
-    cout << "Define the accepting states  (state numbers separated by spaces, ex. 2 4):"<<endl;
+        for example if p,q are not equivalents and r --a-> p, s --a-> q, then r,s are marked as non-equivalents
+        then r,s is pushed to the list as a pair to check their dependencies 
+        
+        */
     
-    // initializing the frequency array of all states to determine whether a state is accepted or not in O(1) 
-    is_accepting = new bool[num_states ];
-    for (int i = 0; i < num_states; i++) is_accepting[i] = false;
-
-    // marking all the accepting states
-    for (int i = 0; i < accepting_states; i++)
-    {
-        int state; cin >> state;
-        is_accepting[state] = true;
-    }
-
-    
-}
-
-
-void build_nonequivalent_list(bool **&equivalent, const bool *is_accepting, list<Pair> &non_eq, const int num_states) 
-{ 
-    /*
-        fills the @non_eq list with the non equivalent pairs
-        also builds the @equivalent matrix the determines if two states are equivalents
-    */
-
-    equivalent = new bool* [num_states];
-    for (int i = 0; i < num_states; i++)
-        equivalent[i] = new bool [num_states];
-    
-    
-    // marking each pair of accepting and non-accepting state as not equivalent
-    for (int i = 0; i < num_states; i++) 
-        // stop at j <= i so we visit each pair only once as the matrix is symmetric
-        for (int j = 0; j <= i; j++) {
-            equivalent[i][j] = (is_accepting[i] == is_accepting[j]);
-            equivalent[j][i] = equivalent[i][j];
-            if (!equivalent[i][j])
-                non_eq.push(Pair(i,j));
-        }
-}
-
-
-void mark_dependencies(bool **&is_equivalent, list<Pair> &non_equivalent_pairs, list<int> **reverse_graph) 
-{
-    /*
-        when two states p,q are found inequivalent, PLEASE change the @is_equivalent[p][q] to false
-        iterate over the @non_equivalent_pairs, construct dependencies of each pair from the reversed graph
-        and mark their states as non equivalents
-    */
-
-    for (int idx = 0; idx < non_equivalent_pairs.size(); ++idx)
-    {
-        Pair cur = non_equivalent_pairs[idx];
-        int p = cur.p, q = cur.q;
-
-        for (int a = 0; a < ALPHA; ++a)
+        for (int idx = 0; idx < non_equivalent_pairs.size(); ++idx)
         {
-            list<int> &pred_p = reverse_graph[p][a]; // go to p by a
-            list<int> &pred_q = reverse_graph[q][a]; // go to q b a
-
-            for (int i = 0; i < pred_p.size(); ++i)
+            Pair cur = non_equivalent_pairs[idx];
+            int p = cur.p, q = cur.q;
+    
+            for (int a = 0; a < ALPHA; ++a)
             {
-                int r = pred_p[i];
-                for (int j = 0; j < pred_q.size(); ++j)
+                list<int> &pred_p = reversed_graph[p][a]; // go to p by a
+                list<int> &pred_q = reversed_graph[q][a]; // go to q b a
+    
+                for (int i = 0; i < pred_p.size(); ++i)
                 {
-                    int s = pred_q[j];
-                    if (r == s) continue;
-
-                    if (is_equivalent[r][s])
+                    int r = pred_p[i];
+                    for (int j = 0; j < pred_q.size(); ++j)
                     {
-                        is_equivalent[r][s] = false;
-                        is_equivalent[s][r] = false;
-                        non_equivalent_pairs.push(Pair(r, s));
+                        int s = pred_q[j];
+                        if (r == s) continue;
+    
+                        if (equivalent[r][s])
+                        {
+                            equivalent[r][s] = false;
+                            equivalent[s][r] = false;
+                            non_equivalent_pairs.push(Pair(r, s));
+                        }
                     }
                 }
             }
         }
     }
-}
-
-
-int* build_representatives(bool **equivalent, int num_states)
-{
-    int *rep = new int[num_states];
-    for (int i = 0; i < num_states; i++)
+    
+    
+    int* build_representatives()
     {
-        rep[i] = i;
-        for (int j = 0; j < i; j++)
-            if (equivalent[i][j]) { rep[i] = j; break; }
-    }
-    return rep;
-}
-
-// for example {1,2}
-void print_class(int r, const int *rep, int num_states)
-{
-    cout << "{";
-    bool first = true;
-    for (int i = 0; i < num_states; i++)
-        if (rep[i] == r)
+        int *rep = new int[num_states];
+        for (int i = 0; i < num_states; i++)
         {
-            if (!first) cout << ",";
-            cout << i;
-            first = false;
+            rep[i] = i;
+            for (int j = 0; j < i; j++)
+                if (equivalent[i][j]) { rep[i] = j; break; }
         }
-    cout << "}";
-}
+        return rep;
+    }
 
-void print_minimized(list<int> **adj, const bool *is_accepting, const int *rep, int num_states)
-{
-    int m = 0;
-    for (int i = 0; i < num_states; i++)
-        if (rep[i] == i) m++;
-
-    cout << "Number of states: " << m << endl;
-
-    cout << "States: ";
-    for (int i = 0; i < num_states; i++)
-        if (rep[i] == i) { print_class(i, rep, num_states); cout << " "; }
-    cout << endl;
-
-    cout << "Accepting states: ";
-    for (int i = 0; i < num_states; i++)
-        if (rep[i] == i && is_accepting[i]) { print_class(i, rep, num_states); cout << " "; }
-    cout << endl;
-
-    cout << "Transitions (from -- to -- edge):" << endl;
-    for (int r = 0; r < num_states; r++)
+    
+    void print_class(int r, const int *rep)
     {
-        if (rep[r] != r) continue;
-        for (int a = 0; a < ALPHA; a++)
+        cout << "{";
+        bool first = true;
+        for (int i = 0; i < num_states; i++)
+            if (rep[i] == r)
+            {
+                if (!first) cout << ",";
+                cout << i;
+                first = false;
+            }
+        cout << "}";
+    }
+    
+    
+    void print_minimized(const int *rep)
+    {
+        int m = 0;
+        for (int i = 0; i < num_states; i++)
+            if (rep[i] == i) m++;
+    
+        cout << "Number of states: " << m << endl;
+    
+        cout << "States: ";
+        for (int i = 0; i < num_states; i++)
+            if (rep[i] == i) { print_class(i, rep); cout << " "; }
+        cout << endl;
+    
+        cout << "Accepting states: ";
+        for (int i = 0; i < num_states; i++)
+            if (rep[i] == i && is_accepting[i]) { print_class(i, rep); cout << " "; }
+        cout << endl;
+    
+        cout << "Transitions (from -- to -- edge):" << endl;
+        for (int r = 0; r < num_states; r++)
         {
-            if (adj[r][a].empty()) continue;
-            int t = adj[r][a][0];
-            print_class(r, rep, num_states);        // from
-            cout << " -- ";
-            print_class(rep[t], rep, num_states);   // to
-            cout << " -- " << char('a' + a) << endl; // edge
+            if (rep[r] != r) continue;
+            for (int a = 0; a < ALPHA; a++)
+            {
+                if (adj[r][a].empty()) continue;
+                int t = adj[r][a][0];
+                print_class(r, rep);        // from
+                cout << " -- ";
+                print_class(rep[t], rep);   // to
+                cout << " -- " << char('a' + a) << endl; // edge
+            }
         }
     }
-}
+    
+    void minimize()
+    {
+        build_nonequivalent_list();
+        mark_dependencies();
+        int *rep = build_representatives();
+        print_minimized(rep);
+        delete[] rep;
+    }
+};
 
-void minimize(DFA &dfa)
-{
-    bool **equivalent = nullptr;
-    list<Pair> non_equivalents;
-    build_nonequivalent_list(equivalent, dfa.is_accepting, non_equivalents, dfa.num_states);
-    mark_dependencies(equivalent, non_equivalents, dfa.reversed_graph);
-    int *rep = build_representatives(equivalent, dfa.num_states);
-    print_minimized(dfa.adj, dfa.is_accepting, rep, dfa.num_states);
-
-    for (int i = 0; i < dfa.num_states; i++) delete[] equivalent[i];
-    delete[] equivalent;
-    delete[] rep;
-}
 
 int main()
 {
-    // ----- Test 1: first board example (accepting state: 4)
+    // Test 1: first board example (accepting state: 4)
     DFA d1(5);
     d1.add_transition(0, 2, 'a');
     d1.add_transition(0, 1, 'b');
@@ -324,9 +282,9 @@ int main()
     d1.set_accepting(4);
 
     cout << "===== Test 1 =====" << endl;
-    minimize(d1);
+    d1.minimize();
 
-    // ----- Test 2: second board example (accepting states: {4, 5})
+    // Test 2: second board example (accepting states: {4, 5})
     DFA d2(6);
     d2.add_transition(0, 1, 'a');
     d2.add_transition(0, 2, 'b');
@@ -344,7 +302,7 @@ int main()
     d2.set_accepting(5);
 
     cout << endl << "===== Test 2 =====" << endl;
-    minimize(d2);
+    d2.minimize();
 
     return 0;
 }
