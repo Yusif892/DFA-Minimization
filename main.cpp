@@ -190,9 +190,17 @@ struct DFA
         }
     }
     
-    
+
     int* build_representatives()
     {
+        /*
+        iterates over all states and assigns a representative to each state
+        if a state is equivalent to a previous state, it takes the smallest equivalent state as its representative. otherwise, the state represents itself.
+
+        for example if states 0,2,4 are equivalent and states 1,3 are equivalent,
+        then the representatives will be {0,1,0,1,0}.
+        */
+
         int *rep = new int[num_states];
         for (int i = 0; i < num_states; i++)
         {
@@ -203,9 +211,17 @@ struct DFA
         return rep;
     }
 
-    
+
     void print_class(int r, const int *rep)
     {
+        /*
+        iterates over all states and prints the states that belong to the equivalence class represented by the given representative.
+        a state belongs to the class if its representative matches the given r.
+
+        for example if rep = {0,1,0,1,0} and r = 0,
+        then it prints the equivalence class {0,2,4}.
+        */
+
         cout << "{";
         bool first = true;
         for (int i = 0; i < num_states; i++)
@@ -218,9 +234,16 @@ struct DFA
         cout << "}";
     }
     
-    
+
     void print_minimized(const int *rep)
     {
+        /*
+        prints the minimized DFA using the representative of each equivalence class. counts and prints the minimized states, accepting states, and transitions.
+
+        for each representative, it prints its equivalence class.
+        transitions are taken from the representative states because all states in the same equivalence class have equivalent transitions.
+        */
+
         int m = 0;
         for (int i = 0; i < num_states; i++)
             if (rep[i] == i) m++;
@@ -252,9 +275,17 @@ struct DFA
             }
         }
     }
-    
+
+
     void minimize()
     {
+        /*
+        performs the DFA minimization process by initializing the equivalence matrix, marking all non-equivalent state pairs, and propagating their dependencies.
+        then builds the representatives array to identify the minimized states.
+
+        returns the representative of each state, which is used to construct and print the minimized DFA.
+        */
+
         build_nonequivalent_list();
         mark_dependencies();
         int *rep = build_representatives();
