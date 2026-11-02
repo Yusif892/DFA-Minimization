@@ -69,6 +69,53 @@ struct Pair
     }
 };
 
+struct DFA
+{
+    int num_states;
+    list<int> **adj;
+    list<int> **reversed_graph;
+    bool *is_accepting;
+
+    DFA(int n) : num_states(n)
+    {
+        adj = new list<int>* [n];
+        reversed_graph = new list<int>* [n];
+        for (int i = 0; i < n; i++)
+        {
+            adj[i] = new list<int> [ALPHA];
+            reversed_graph[i] = new list<int> [ALPHA];
+        }
+        is_accepting = new bool[n];
+        for (int i = 0; i < n; i++) is_accepting[i] = false;
+    }
+
+    ~DFA()
+    {
+        for (int i = 0; i < num_states; i++)
+        {
+            delete[] adj[i];
+            delete[] reversed_graph[i];
+        }
+        delete[] adj;
+        delete[] reversed_graph;
+        delete[] is_accepting;
+    }
+
+    DFA(const DFA &) = delete;
+
+    DFA& operator=(const DFA &) = delete;
+
+    void add_transition(int from, int to, char sym)
+    {
+        adj[from][sym - 'a'].push(to);
+        reversed_graph[to][sym - 'a'].push(from);
+    }
+
+    void set_accepting(int state)
+    {
+        is_accepting[state] = true;
+    }
+};
 
 void read_input(list<int> **&adj, list<int> **&reversed_graph, bool *&is_accepting, int &num_states)
 {
@@ -197,22 +244,40 @@ int* build_representatives(bool **equivalent, int num_states)
     return rep;
 }
 
-void print_minimized(list<int> **adj, const bool *is_accepting,const int *rep, int num_states)
+// for example {1,2}
+void print_class(int r, const int *rep, int num_states)
 {
-    int *new_id = new int[num_states];
+    cout << "{";
+    bool first = true;
+    for (int i = 0; i < num_states; i++)
+        if (rep[i] == r)
+        {
+            if (!first) cout << ",";
+            cout << i;
+            first = false;
+        }
+    cout << "}";
+}
+
+void print_minimized(list<int> **adj, const bool *is_accepting, const int *rep, int num_states)
+{
     int m = 0;
     for (int i = 0; i < num_states; i++)
-        if (rep[i] == i) new_id[i] = m++;
+        if (rep[i] == i) m++;
 
     cout << "Number of states: " << m << endl;
 
-    cout << "Accepting state/s is/are:";
+    cout << "States: ";
     for (int i = 0; i < num_states; i++)
-        if (rep[i] == i && is_accepting[i])
-            cout << " " << new_id[i];
+        if (rep[i] == i) { print_class(i, rep, num_states); cout << " "; }
     cout << endl;
 
-    cout << "Transitions (from -- to -- symbol):" << endl;
+    cout << "Accepting states: ";
+    for (int i = 0; i < num_states; i++)
+        if (rep[i] == i && is_accepting[i]) { print_class(i, rep, num_states); cout << " "; }
+    cout << endl;
+
+    cout << "Transitions (from -- to -- edge):" << endl;
     for (int r = 0; r < num_states; r++)
     {
         if (rep[r] != r) continue;
@@ -220,26 +285,66 @@ void print_minimized(list<int> **adj, const bool *is_accepting,const int *rep, i
         {
             if (adj[r][a].empty()) continue;
             int t = adj[r][a][0];
-            cout << new_id[r] << " " << new_id[rep[t]] << " " << char('a' + a) << endl;
+            print_class(r, rep, num_states);        // from
+            cout << " -- ";
+            print_class(rep[t], rep, num_states);   // to
+            cout << " -- " << char('a' + a) << endl; // edge
         }
     }
-    delete[] new_id;
+}
+
+void minimize(DFA &dfa)
+{
+    bool **equivalent = nullptr;
+    list<Pair> non_equivalents;
+    build_nonequivalent_list(equivalent, dfa.is_accepting, non_equivalents, dfa.num_states);
+    mark_dependencies(equivalent, non_equivalents, dfa.reversed_graph);
+    int *rep = build_representatives(equivalent, dfa.num_states);
+    print_minimized(dfa.adj, dfa.is_accepting, rep, dfa.num_states);
+
+    for (int i = 0; i < dfa.num_states; i++) delete[] equivalent[i];
+    delete[] equivalent;
+    delete[] rep;
 }
 
 int main()
 {
-    list<int> **adj = nullptr, **reversed_graph = nullptr;
-    bool *is_accepting;
-    int num_states,start_state;
-    read_input(adj, reversed_graph, is_accepting, num_states);
+    // ----- Test 1: first board example (accepting state: 4)
+    DFA d1(5);
+    d1.add_transition(0, 2, 'a');
+    d1.add_transition(0, 1, 'b');
+    d1.add_transition(1, 3, 'a');
+    d1.add_transition(1, 1, 'b');
+    d1.add_transition(2, 3, 'a');
+    d1.add_transition(2, 2, 'b');
+    d1.add_transition(3, 3, 'a');
+    d1.add_transition(3, 4, 'b');
+    d1.add_transition(4, 4, 'a');
+    d1.add_transition(4, 4, 'b');
+    d1.set_accepting(4);
 
-    bool **equivalent = nullptr;
-    list<Pair> non_equivalents;
-    build_nonequivalent_list(equivalent, is_accepting, non_equivalents, num_states);
+    cout << "===== Test 1 =====" << endl;
+    minimize(d1);
 
-    mark_dependencies(equivalent, non_equivalents, reversed_graph);
+    // ----- Test 2: second board example (accepting states: {4, 5})
+    DFA d2(6);
+    d2.add_transition(0, 1, 'a');
+    d2.add_transition(0, 2, 'b');
+    d2.add_transition(1, 4, 'a');
+    d2.add_transition(1, 1, 'b');
+    d2.add_transition(2, 4, 'a');
+    d2.add_transition(2, 3, 'b');
+    d2.add_transition(3, 4, 'a');
+    d2.add_transition(3, 3, 'b');
+    d2.add_transition(4, 4, 'a');
+    d2.add_transition(4, 5, 'b');
+    d2.add_transition(5, 5, 'a');
+    d2.add_transition(5, 5, 'b');
+    d2.set_accepting(4);
+    d2.set_accepting(5);
 
-    int *rep = build_representatives(equivalent, num_states);
-    print_minimized(adj, is_accepting, rep, num_states);
+    cout << endl << "===== Test 2 =====" << endl;
+    minimize(d2);
+
     return 0;
 }
